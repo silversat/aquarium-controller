@@ -52,6 +52,7 @@ void printBlinkingString( char* msg, byte row=0xFF ) {
 		status = !status;
 		blinkTimer = millis();
 	}
+//	if(blinkTimer > millis()) blinkTimer = millis();
 }
 
 void printChar( char chr, byte col=0xFF, byte row=0xFF ) {
@@ -85,5 +86,5 @@ void stampafrecce( byte col=0xFF, byte row=0xFF, byte before=0, byte after=0, by
 void DisplayInit() {
 	display.begin();								// inizializzazione del display  
 	display.backlight();
-	DEBUG("Display OK\n");
+	DEBUG(F("Lcd display OK\n"));
 }

@@ -4,7 +4,6 @@
 OneWire oneWire(PIN_ONE_WIRE_BUS);				// define one-wire bus instance
 DallasTemperature sensors(&oneWire);			// define temp sensors on the bus
 DeviceAddress Termometro1, Termometro2;			// temp sensor addresses
-float tmed;										// temp sensor read values
 boolean Tsensor1, Tsensor2;						// found temp sensors during setup one-wire bus scan
 unsigned long readTimer = 0;
 
@@ -23,7 +22,6 @@ unsigned long alarm_millis;
 #define DEFCON_5	5		// the lowest DEFCON (all right)
 int	defcon = DEFCON_5;
 
-
 // Impostazione della temperatura dell'acqua, e sua memorizzazione in eeprom,
 // potendo memorizzare in memoria solo byte (interi da 0 a 255) ho stabilito 40 gradi come valore massimo
 // e incrementi di immissione di 0,5 gradi in modo che quando
@@ -33,7 +31,9 @@ int	defcon = DEFCON_5;
 // leggo il valore in memoria: 55, lo moltiplico per 0,5 ed ottengo 27,5 ossia il valore impostato
 // se decidessimo per un incremento di 0,25 sarebbe la stessa cosa, ma mi e' sembrato eccessivo.	
 //
-void ImpostaTempAcqua() {  
+void ImpostaTempAcqua() { 
+	static bool confirm = true;
+	
 	if(CheckInitBit(true)) {		// Leggo in memoria il valore impostato e predispongo la schermata del display
 		Tempacquaset = Tempacqua;
 		if(Tempacquaset > TEMP_ALLOWED_MAX or Tempacquaset < TEMP_ALLOWED_MIN) {
@@ -47,7 +47,7 @@ void ImpostaTempAcqua() {
 
 	printNumber(Tempacquaset, 6, 2);
 
-	if(conferma) {
+	if(confirm) {
 		stampafrecce(6, 3, 0, 1); 
 		stampafrecce();
 
@@ -69,7 +69,7 @@ void ImpostaTempAcqua() {
 				break;	
 
 			case IR_OK:
-				conferma = false; // disattivo questa if in modo che Il tasto OK funzioni solo con la if di conferma definitiva
+				confirm = false; // disattivo questa if in modo che Il tasto OK funzioni solo con la if di conferma definitiva
 				break;
 
 			case IR_MENU:
@@ -77,31 +77,76 @@ void ImpostaTempAcqua() {
 				break;
 		}
 	} else {	
-		printBlinkingString(confirm);
+		printBlinkingString(confirm_msg);
 		if(kp_new == IR_OK or kp_new == IR_MENU)	{	
 			if(kp_new == IR_OK and Tempvecchia != Tempacquaset)	{	
-				WriteStaticMemory(SMEMORY_TEMP_ADDR, int(Tempacquaset / 0.5));
+				updateStaticMemory(NVRAM_TEMP_ADDR, int(Tempacquaset / 0.5));
 				Tempacqua = Tempacquaset;
 			}
-			conferma = true;
+			confirm = true;
 			dstatus = DS_IDLE_INIT;
 		}
 
 		if((kp_new == IR_RIGHT) || (kp_new == IR_LEFT) || (kp_new == IR_UP) || (kp_new == IR_DOWN)) {	
 			printSpaces(20, 0, 3);
-			conferma = true;
+			confirm = true;
 		}
 	}
 }
 
-void MantenimentoTempAcqua () {
-	if(tmed < Tempacqua) {
+float getWaterTemperature() {
+	static float tempRing[TEMP_SAMPLES_NUM];
+	static float tmed;
+	static uint8_t idx = 0;
+	float t1, t2;
+	
+	if (millis() - readTimer > TEMP_READ_INTERVAL) {	
+		readTimer = millis();
+		sensors.requestTemperatures();
+		
+		if(Tsensor1) {
+			t1 = sensors.getTempC(Termometro1);
+//			DEBUG(F("T1=%s"), ftoa(buff, t1));
+		}	
+			
+		if(Tsensor2) {	
+			t2 = sensors.getTempC(Termometro2);
+//			DEBUG(F(", T2=%s"), ftoa(buff, t2));
+		}	
+			
+		if(Tsensor1 && Tsensor2) {
+			tempRing[idx] = (t1 + t2)/2;
+		} else {
+			if(Tsensor1) {
+				tempRing[idx] = t1;
+			} else if(Tsensor2) {
+				tempRing[idx] = t2;
+			} else {
+				tempRing[idx] = 0;
+			}
+		}
+		
+		tmed = calcRingBufAverage(tempRing, TEMP_SAMPLES_NUM);
+//		if(tmed != 0) {
+//			DEBUG(F(", Tmed=%s\n"), ftoa(buff, tmed));
+//		}	
+		if(++idx >= TEMP_SAMPLES_NUM) idx = 0;			// increment ring index and check for outbound
+	}
+	return tmed;
+}
+
+float WaterTemperatureHandler() {
+	static float tempMed = 0.0;
+	
+	tempMed = getWaterTemperature();
+
+	if(tempMed < Tempacqua) {
 		relais(SR_RISCALDATORE, RL_ON); 
 	} else {
 		relais(SR_RISCALDATORE, RL_OFF);
 	}
 	
-	if((tmed < (Tempacqua - TEMP_RANGE)) or (tmed > (Tempacqua + TEMP_RANGE))) {
+	if((tempMed < (Tempacqua - TEMP_RANGE)) or (tempMed > (Tempacqua + TEMP_RANGE))) {
 		defcon = DEFCON_3;
 	} else if(defcon == DEFCON_3) {
 		defcon = DEFCON_4;
@@ -125,7 +170,7 @@ void MantenimentoTempAcqua () {
 			}
 			if(dstatus == DS_IDLE) {
 				if(alarm_cycle) {
-					printNumber(tmed, 3, 2);
+					printString(ftoa(buff, tempMed), 3, 2);
 					printChar(0b011011111);
 					if(alrmsonoro) {
 						alarm(true, true);				// status = in alarm, beep ON
@@ -145,47 +190,16 @@ void MantenimentoTempAcqua () {
 			
 		case DEFCON_5:
 			if(dstatus == DS_IDLE) {
-				printNumber(tmed, 3, 2);
+				printString(ftoa(buff, tempMed), 3, 2);
 				printChar(0b011011111);
 			}
 			break;
 	}
-}
-
-void GetTemperature() {
-	float t1, t2;
-	
-	if (millis() - readTimer > TEMPO_LETTURA) {	
-		readTimer = millis();
-		sensors.requestTemperatures();
-		
-		if(Tsensor1) {
-			t1 = sensors.getTempC(Termometro1);
-//			DEBUG("T1=%s", ftoa(buff, t1));
-		}	
-			
-		if(Tsensor2) {	
-			t2 = sensors.getTempC(Termometro2);
-//			DEBUG(", T2=%s", ftoa(buff, t2));
-		}	
-			
-		if(Tsensor1 && Tsensor2) {
-			tmed = (t1 + t2)/2;
-		} else {
-			if(Tsensor1) {
-				tmed = t1;
-			} else {
-				tmed = 0;
-			}
-		}	
-		if(tmed != 0) {
-//			DEBUG(", Tmed=%s\n", ftoa(buff, tmed));
-		}	
-	}
+	return tempMed;
 }
 
 void TempSensorsInit() {
-	Tempacqua = ReadStaticMemory(SMEMORY_TEMP_ADDR) * 0.5;		// read desired water temp from nvram
+	Tempacqua = readStaticMemory(NVRAM_TEMP_ADDR) * 0.5;		// read desired water temp from nvram
 	
 	sensors.begin();
 	Tsensor1 = sensors.getAddress(Termometro1, 0);		// get sensor 1 address, if present (TsensorX true if sensor present, TermometroX contains the address)
@@ -205,5 +219,5 @@ void TempSensorsInit() {
 			sensors.setResolution(Termometro2, TEMP_SENSOR_RESOLUTION);		// else configure it
 		}
 	}
-	DEBUG("Temperature sensor OK\n");
+	DEBUG(F("Temperature sensor OK\n"));
 }

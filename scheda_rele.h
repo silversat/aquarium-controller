@@ -3,14 +3,19 @@
 //	this code has been developed onto a 'funduino' Keyes ralais board HCARDU0018 ver.8R1A
 //	the board include 8 relais. 4 relais board at the time is enough (HCARDU0015 ver.4R1B)
 //
-byte relaisPin[SR_RELAIS_NUM] = { PIN_RELAIS_1, PIN_RELAIS_2, PIN_RELAIS_3, PIN_RELAIS_4,
-								  PIN_RELAIS_5, PIN_RELAIS_6, PIN_RELAIS_7, PIN_RELAIS_8 };
+uint8_t relaisPin[SR_RELAIS_NUM] = { 	
+										PIN_RELAIS_1, PIN_RELAIS_2, PIN_RELAIS_3, PIN_RELAIS_4,
+										PIN_RELAIS_5, PIN_RELAIS_6, PIN_RELAIS_7, PIN_RELAIS_8 
+									};
 
-void relais( byte idx, boolean action ) {
-	digitalWrite(relaisPin[idx-1], action);
+void relais( uint8_t idx, bool action ) {
+	if(action != digitalRead(relaisPin[idx-1])) {
+		digitalWrite(relaisPin[idx-1], action);
+		DEBUG(F("Relais %d has been switched %s\n"), idx, action?"On":"Off");
+	}
 }
 
-boolean	relaisStatus( byte idx ) {
+boolean	relaisStatus( uint8_t idx ) {
 	return digitalRead(relaisPin[idx-1]);
 }
 
@@ -20,5 +25,5 @@ void RelaisInit() {
 		delay(100);								// wait 100 mS in order the bus stabilize.
 		digitalWrite(relaisPin[i], RL_OFF);		// switch relais off (security default)
 	}
-	DEBUG("Relais board OK\n");
+	DEBUG(F("Relais board OK\n"));
 }	

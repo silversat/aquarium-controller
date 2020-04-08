@@ -10,11 +10,12 @@ typedef struct {
 
 menu_type MainMenu[] = {
 	{1, "SETUP"},						// il primo valore contiene la voce di menu selezionata per ultima
-	{DS_SETUP_INFOLIGHTS, "Info Luci"},
-	{DS_SETUP_LIGHTS, "Imposta Luci"},
-	{DS_SETUP_TEMP, "Temperatura"}, 
-	{DS_SETUP_DATETIME, "Data/Ora"},
-//	{DS_SETUP_SPARE_1, "Spare item 1"},
+	{DS_SETUP_INFOLIGHTS, "Info light"},
+	{DS_SETUP_LIGHTS, "Light setup"},
+	{DS_SETUP_TEMP, "Temperature"}, 
+	{DS_SETUP_DATETIME, "Date/Time"},
+	{DS_SETUP_CALIBRATION, "Calibration"},
+	{DS_SETUP_TIMERUN, "Fast Time Run"}
 //	{DS_SETUP_SPARE_2, "Spare item 2"},
 //	{DS_SETUP_SPARE_3, "Spare item 3"},
 //	{DS_SETUP_SPARE_4, "Spare item 4"},
@@ -39,7 +40,6 @@ void arrayRotateRight( int arr[], int size ) {
 
 void ScorriMenu( menu_type arraymenu[], int size )  {
 	uint8_t nItems = (size/sizeof(menu_type))-1;
-//	uint8_t nRow = nItems/2;
 	uint8_t nRow = DISPLAY_MAX_ROWS/2;
 	static int arr[16];					// ???
 	static boolean stampato;
@@ -78,14 +78,18 @@ void ScorriMenu( menu_type arraymenu[], int size )  {
 	if(!stampato) {	
 		int startcol, itemlen;
 		for(uint8_t i = 0; i < DISPLAY_MAX_ROWS-1; i++) {
-			startcol = i<nRow?nRow-i:i-nRow+2;
-			itemlen = strlen(arraymenu[arr[i]].desc);
-			if(itemlen + startcol >= DISPLAY_MAX_COLS) {
-				strncpy(buff, arraymenu[arr[i]].desc, DISPLAY_MAX_COLS);
-				printString(buff, startcol, i+1);
+			if(i < nItems) {
+				startcol = i<nRow?nRow-i:i-nRow+2;
+				itemlen = strlen(arraymenu[arr[i]].desc);
+				if(itemlen + startcol >= DISPLAY_MAX_COLS) {
+					strncpy(buff, arraymenu[arr[i]].desc, DISPLAY_MAX_COLS);
+					printString(buff, startcol, i+1, false);
+				} else {
+					printString(arraymenu[arr[i]].desc, startcol, i+1, false);
+					printSpaces(DISPLAY_MAX_COLS-itemlen-startcol, false);
+				}
 			} else {
-				printString(arraymenu[arr[i]].desc, startcol, i+1, false);
-				printSpaces(DISPLAY_MAX_COLS-itemlen-startcol, false);
+				displayClearRow(i+1);
 			}
 		}
 		printCommit();

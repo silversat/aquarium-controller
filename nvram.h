@@ -12,7 +12,7 @@
 	#include <EEPROM.h>
 #endif
 
-uint8_t ReadStaticMemory( int address ) {
+uint8_t readStaticMemory( int address ) {
 	uint8_t ret = false;
 	#ifdef USE_RTC_NVRAM
 		ret = nvram.readByte(address);
@@ -23,7 +23,7 @@ uint8_t ReadStaticMemory( int address ) {
 	return ret;
 }	
 
-void WriteStaticMemory( int address, uint8_t data ) {
+void writeStaticMemory( int address, uint8_t data ) {
 	#ifdef USE_RTC_NVRAM
 		nvram.writeByte(address, data);
 		delay(10);
@@ -33,7 +33,7 @@ void WriteStaticMemory( int address, uint8_t data ) {
 //	DEBUG(F("Writing: address=%d, data=%d\n"), address, data);
 }
 
-void UpdateStaticMemory( int address, uint8_t data ) {
+void updateStaticMemory( int address, uint8_t data ) {
 	#ifdef USE_RTC_NVRAM
 		uint8_t ret = nvram.readByte(address);
 		if(data != ret) {
@@ -47,8 +47,8 @@ void UpdateStaticMemory( int address, uint8_t data ) {
 }
 
 int readStaticMemoryInt( int address ) {
-	uint8_t high = ReadStaticMemory(address);
-	uint8_t low = ReadStaticMemory(address+1);
+	uint8_t high = readStaticMemory(address);
+	uint8_t low = readStaticMemory(address+1);
 //	DEBUG(F("Read int: address=%d, value=%d, high: %d, low: %d\n"), address, word(high,low), high, low);
 	return word(high,low);
 }
@@ -56,12 +56,41 @@ int readStaticMemoryInt( int address ) {
 bool writeStaticMemoryInt( int address, int value ) {
 	bool ret = false;
 	if(value != readStaticMemoryInt(address)) {
-		WriteStaticMemory(address, highByte(value));
-		WriteStaticMemory(address+1, lowByte(value));
+		writeStaticMemory(address, highByte(value));
+		writeStaticMemory(address+1, lowByte(value));
 		ret = true;
 //		DEBUG(F("Writing int: address=%d, value=%d, high: %d, low: %d\n"), address, value, highByte(value), lowByte(value));
 	}
 	return ret;
+}
+
+bool updateStaticMemoryInt( int address, int value ) {
+	bool ret = false;
+	if(value != readStaticMemoryInt(address)) {
+		updateStaticMemory(address, highByte(value));
+		updateStaticMemory(address+1, lowByte(value));
+		ret = true;
+//		DEBUG(F("Writing int: address=%d, value=%d, high: %d, low: %d\n"), address, value, highByte(value), lowByte(value));
+	}
+	return ret;
+}
+
+template <class T> int NvramWriteAnything(int ee, const T& value) {
+	const byte* p = (const byte*)(const void*)&value;
+	int i;
+	for(i = 0; i < sizeof(value); i++) {
+		writeStaticMemory(ee++, *p++);
+	}
+	return i;
+}
+
+template <class T> int NvramReadAnything(int ee, T& value) {
+	byte* p = (byte*)(void*)&value;
+	int i;
+	for(i = 0; i < sizeof(value); i++) {
+		*p++ = readStaticMemory(ee++);
+	}
+	return i;
 }
 
 void NvRamInit() {

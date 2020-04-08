@@ -1,4 +1,27 @@
 
+float calcRingBufAverage( float ringBuf[], int samples ) {
+	float ret = 0;
+	int samp_count = 0;
+	for(int idx = 0; idx < samples; idx++) {
+		if(ringBuf[idx] > 0) {
+			samp_count++;
+			ret += ringBuf[idx];
+		}
+	}
+	if(samp_count > 0) {
+		return (ret / samp_count);
+	} else {
+		return NAN;
+	}
+}
+
+char* ftoa(char *a, double f) {
+	long unit = (long)f;
+	long decimal = abs((long)((f - unit) * 100));
+	sprintf(a, "%2lu.%02lu", unit, decimal);
+	return a;
+}
+
 String spaces( byte num ) {
 	String ret = "";
 	for(int i = 0; i < num; i++) {
@@ -16,9 +39,9 @@ void SetInitBit( byte status ) {
 	bitSet(dstatus, DS_INIT_BIT);
 }
 	
-//void ClearInitBit() {
-//	bitClear(dstatus, DS_INIT_BIT);
-//}
+void ClearInitBit() {
+	bitClear(dstatus, DS_INIT_BIT);
+}
 	
 boolean CheckInitBit( boolean clearflag ) {		// chech init bit. if clearflag set, clear it too.
 	boolean ret = bitRead(dstatus, DS_INIT_BIT);
@@ -29,7 +52,7 @@ boolean CheckInitBit( boolean clearflag ) {		// chech init bit. if clearflag set
 }
 
 void printDeviceNotFound( int device ) {
-	DEBUG("Temperature device %d not found\n", device); 
+	DEBUG(F("Temperature device %d not found\n"), device); 
 }
 
 byte decToBcd(byte val) { 	// Da decimale a binario
@@ -58,11 +81,4 @@ void ScrollHandler( uint8_t &value, uint8_t Min, uint8_t Max, uint8_t action) { 
 			}
 			break;
 	}
-}
-
-char* ftoa(char *a, double f) {
-	long unit = (long)f;
-	long decimal = abs((long)((f - unit) * 100));
-	sprintf(a, "%02lu.%02lu", unit, decimal);
-	return a;
 }
