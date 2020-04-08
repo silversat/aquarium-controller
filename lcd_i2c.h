@@ -52,6 +52,7 @@ void printBlinkingString( char* msg, byte row=0xFF ) {
 		status = !status;
 		blinkTimer = millis();
 	}
+//	if(blinkTimer > millis()) blinkTimer = millis();
 }
 
 void printChar( char chr, byte col=0xFF, byte row=0xFF ) {

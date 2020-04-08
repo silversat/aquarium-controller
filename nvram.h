@@ -64,6 +64,24 @@ bool writeStaticMemoryInt( int address, int value ) {
 	return ret;
 }
 
+template <class T> int NvramWriteAnything(int ee, const T& value) {
+	const byte* p = (const byte*)(const void*)&value;
+	int i;
+	for(i = 0; i < sizeof(value); i++) {
+		WriteStaticMemory(ee++, *p++);
+	}
+	return i;
+}
+
+template <class T> int NvramReadAnything(int ee, T& value) {
+	byte* p = (byte*)(void*)&value;
+	int i;
+	for(i = 0; i < sizeof(value); i++) {
+		*p++ = ReadStaticMemory(ee++);
+	}
+	return i;
+}
+
 void NvRamInit() {
 	#ifdef USE_RTC_NVRAM
 		nvram.initialize();
