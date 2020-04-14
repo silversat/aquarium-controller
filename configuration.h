@@ -2,9 +2,11 @@
 //	Display configuration
 //
 
-//#define OLED_32					// if defined, 128x32 oled display is used, otherwise LCD 20x4
-//#define OLED_64					// if defined, 128x64 oled display is used, otherwise LCD 20x4
-//#define OLED_128					// if defined, 128x128 oled display is used, otherwise LCD 20x4
+#define	SERIAL_BAUD			115200	// seriale monitor port
+
+//#define OLED_32	0x3C			// if defined, 128x32 oled display is used, otherwise LCD 20x4
+//#define OLED_64	0x3C			// if defined, 128x64 oled display is used, otherwise LCD 20x4
+//#define OLED_128	0x3C			// if defined, 128x128 oled display is used, otherwise LCD 20x4
 
 #define RELE_PARALLEL				// if defined, use a parallel rele board, otherwise use a serial i2c rele board (PCF8574)
 
@@ -12,39 +14,50 @@
 #define	MINUTES_PER_DAY		1440
 #define	MINUTES_PER_2DAYS	MINUTES_PER_DAY*2
 #define	SECONDS_PER_DAY		86400
+#define	NOT_AVAILABLE		" N/A "
 
 //
 //	Arduino PIN configuration
 //
-#define PIN_LIGHT_PWM_BASE	3		// PWM pin for led line 1 to LIGHT_LINE_NUMBER (3-8)
-#define PIN_ONE_WIRE_BUS	46
-#define PIN_IR_RECEIVER		49
-#define PIN_PH_SENSOR		A8
-#define PIN_EC_SENSOR		A11
-#define PIN_BUZZER			11
-#define PIN_RELAIS_1		22		// these are for the parallel relais board
-#define PIN_RELAIS_2		23		// WARNING: you must configure 'relaisPin' array in 'scheda_rele.h' according with these defines
-#define PIN_RELAIS_3		24		//			and SR_RELAIS_NUM into the relais board section below.
-#define PIN_RELAIS_4		25
-#define PIN_RELAIS_5		26
-#define PIN_RELAIS_6		27
-#define PIN_RELAIS_7		28
-#define PIN_RELAIS_8		29
-//
-// seriale monitor port
-//
-#define	SERIAL_BAUD			115200
+#define PIN_LIGHT_PWM_BASE		3		// PWM pin for led line 1 to LIGHT_LINE_NUMBER (3-8)
+#define PIN_ONE_WIRE_BUS		46
+#define PIN_IR_RECEIVER			49
+#define PIN_TURBIDITY_SENSOR	A4
+#define PIN_PH_SENSOR			A8
+#define PIN_EC_SENSOR			A11
+#define PIN_BUZZER				11
+#define PIN_LEVEL_SENSOR		18
+									// WARNING: you must configure 'relaisPin' array in 'scheda_rele.h' according with these defines
+									//		and SR_RELAIS_NUM into the relais board section below. these are for the parallel relais board
+#define PIN_RELAIS_1			22
+#define PIN_RELAIS_2			23
+#define PIN_RELAIS_3			24		
+#define PIN_RELAIS_4			25
+#define PIN_RELAIS_5			26
+#define PIN_RELAIS_6			27
+#define PIN_RELAIS_7			28
+#define PIN_RELAIS_8			29
+
 //
 // relais board
 //
 #define	RL_ON					HIGH		// for inverted logic (RL_ON = LOW) change here
 #define	RL_OFF					LOW			//		and here
 #define	SR_RELAIS_NUM			0x08
-#define	SR_RISCALDATORE			0x01		// water heater = relais #1
-#define	SR_LUNAR_LIGHT			0x05		// lunar light = relais #5
-#define	SR_WATER_VALVE_DRAIN	0x06		// drain water valve
-#define	SR_WATER_VALVE_LOAD		0x07		// load water valve
-#define	SR_CO2_VALVE			0x08		// CO2 valve
+#define	SR_WATER_HEATER			0x01		// water heater = relais #1
+#define	SR_WATER_LEVEL			0x02		// water level = relais #2
+#define	SR_TURBIDITY			0x03		// turbidity relais #3
+#define	SR_PH					0x04		// PH alarm relais #4
+#define	SR_PH					0x05		// PH alarm relais #5
+#define	SR_CO2_VALVE			0x06		// CO2 valve
+#define	SR_LUNAR_LIGHT			0x07		// lunar light = relais #7
+#define	SR_WATER_VALVE_DRAIN	0x08		// drain water valve
+#define	SR_WATER_VALVE_LOAD		0x09		// load water valve
+//
+// turbidity (0-3000 NTU (1 NTU = 1 mg/Liter)
+//
+#define	TURBIDITY_MIN			0.5			// min turbidity (hysteresis)
+#define	TURBIDITY_MAX			10			// max turbidity (hysteresis)
 //
 // temperature
 //
@@ -53,6 +66,7 @@
 #define	TEMP_READ_INTERVAL		3000		// temperature time lapse (mSecs)
 #define	PH_READ_INTERVAL		1000		// PH time lapse (mSecs)
 #define	EC_READ_INTERVAL		1000		// PH time lapse (mSecs)
+#define	NTU_READ_INTERVAL		1000		// NTU time lapse (mSecs)
 #define	TEMP_ALLOWED_MIN		10			// min allowed temperature when setting
 #define	TEMP_ALLOWED_MAX		40			// max allowed temperature when setting
 #define	TEMP_ALLOWED_DEFAULT	28			// default temperature when <min or >max in setting

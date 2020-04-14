@@ -19,9 +19,9 @@
 //		Most of the hardware is configurable (configuration.h)
 //
 //============================================================================================
-#define SK_VERSION				"3.6.0"
+#define SK_VERSION				"3.6.1"
+#define SK_DATE					"13-04-2020"
 #define SK_FEATURE				"mega"
-#define SK_DATE					"08-04-2020"
 #define SK_AUTHOR				"c.benedetti"
 
 #define DEBUG(...) Serial.printf( __VA_ARGS__ )		// activate debug
@@ -32,20 +32,32 @@
 #endif
 
 #if defined(__SAM3X8E__)
+	#define SK_FEATURE				"ARM"
 	#define WATCDOG_RESET(...) 		watchdogReset( __VA_ARGS__ )
+	#define PWM_RESOLUTION	1024.0
+	#define ADC_RESOLUTION	4095.0
+	#define ADC_RES_BITS	12
 #else
+	#define SK_FEATURE				"AVR"
 	#include <avr/wdt.h>
 	#define WATCDOG_RESET(...)		wdt_reset( __VA_ARGS__ )
+	#define PWM_RESOLUTION	255
+	#define ADC_RESOLUTION	1023.0
+	#define ADC_RES_BITS	10
 #endif
+
 #include <Wire.h>
 #include <OneWire.h>
 #include "RTClib.h"
 #include <DallasTemperature.h>
 
-#define BUFF_SIZE	24
+#define BUFF_SIZE		24
+#define MAIN_PAGE_FIRST	0
+#define MAIN_PAGE_LAST	3
 
 uint8_t 	kp_new;
 uint8_t		dstatus;					// dispatcher status container
+int			main_page = 0;
 char 		buff[BUFF_SIZE];
 char		confirm_msg[] = "* CONFIRM *";
 
@@ -61,34 +73,68 @@ char		confirm_msg[] = "* CONFIRM *";
 #endif
 #include "datetime.h"
 #include "nvram.h"
-#include "temperature.h"
 #include "menu.h"
 #include "lights.h"
-#include "ph_ec_sensor.h"
 #if defined(RELE_PARALLEL)				// see defines in config.h
 	#include "scheda_rele.h"
 #else
 	#include "scheda_rele_i2c.h"
 #endif
+#include "temperature.h"
+#include "ph_ec_sensor.h"
+#include "level.h"
+#include "turbidity.h"
 
 void NormalOperation() {
 	if(kp_new == IR_MENU) {
 		dstatus = DS_SETUP;								// switch dispatcher to enter menu
 		SetInitBit();
+	} else if(kp_new == IR_OK) {
+		main_page = MAIN_PAGE_FIRST;
+		SetInitBit();
+	} else if(kp_new == IR_RIGHT) {
+		main_page++;
+		if(main_page > MAIN_PAGE_LAST) main_page = MAIN_PAGE_FIRST;
+		SetInitBit();
+	} else if(kp_new == IR_LEFT) {
+		main_page--;
+		if(main_page < MAIN_PAGE_FIRST) main_page = MAIN_PAGE_LAST;
+		SetInitBit();
 	} else {	
-		if(CheckInitBit(true)) {						// check and clear init bit.
-			displayClear();								// clear display
-			printString("AQUARIUM CONTROLLER", 0, 0);	// Scrivo sul display il titolo della schermata 
-
-			printString("T:", 0, 2);
-			printString("PH:", 12, 2);
-			printString("EC:", 12, 3);
+		if(CheckInitBit(true)) {							// check and clear init bit.
+			displayClear();									// clear display
+			if(main_page == MAIN_PAGE_FIRST) {
+				printString("AQUARIUM CONTROLLER", 0, 0);	// Scrivo sul display il titolo della schermata 
+				printString("T:", 0, 2);
+				printString("PH:", 12, 2);
+				printString("EC:", 12, 3);
+			} else if(main_page == 1) {
+				printStringCenter("Water status 1", 0);
+				printString("    Level:", 2, 1);
+				printString(" Temperat:", 2, 2);
+				printString("Turbidity:", 2, 3);
+			} else if(main_page == 2) {
+				printStringCenter("Water status 2", 0);
+				printString("PH:", 2, 1);
+				printString("EC:", 2, 2);
+				printString("   ", 2, 3);
+			} else if(main_page == 3) {
+				sprintf(buff, "System: %s", SK_FEATURE);
+				printStringCenter(buff, 0);
+				sprintf(buff, "Version: %s", SK_VERSION);
+				printStringCenter(buff, 1);
+				sprintf(buff, "Date: %s", SK_DATE);
+				printStringCenter(buff, 2);
+				sprintf(buff, "Author: %s", SK_AUTHOR);
+				printStringCenter(buff, 3);
+			}
 		}
-
-		printDateTime(datetime);						// Stampo data e ora
-
-		sprintf(buff, "DLMed:%3d%%", calcLuxAverage());
-		printString(buff, 0,3);
+		if(main_page == 0) {
+			printDateTime(datetime);						// Stampo data e ora
+			sprintf(buff, "DLMed:%3d%%", calcLuxAverage());
+			printString(buff, 0,3);
+		} else if(main_page == 1) {
+		}
 	}
 }
 
@@ -102,6 +148,8 @@ void loop()	{
 	datetime = getDateTime();
 	LightsHandler();
 	tmed = WaterTemperatureHandler();
+	WaterLevelHandler();
+	WaterTurbidityHandler();
 	Water_PH_Handler(tmed);
 	Water_EC_Handler(tmed);
 	AlarmSireneHandle();
@@ -188,13 +236,13 @@ void setup() {
 	#ifdef DEBUG_MESSAGES
 		Serial.begin(SERIAL_BAUD);	// serial port #1 used for debugging
 		delay(100);					// wait serial port to stabilize
-		Serial.printf(F("Aquarium Controller v.%s by %s (%s)\n"), SK_VERSION, SK_AUTHOR, SK_DATE);
+		Serial.printf(F("Aquarium Controller (%s) v.%s by %s (%s)\n"), SK_FEATURE, SK_VERSION, SK_AUTHOR, SK_DATE);
 		Serial.print(F("Initializing system...\n"));
 	#endif
 	
 	RtcInit();						// Initialize Real Time Clock
 	NvRamInit();					// Initialize Non Volatile RAM
-	DisplayInit();					// Initialize I2C display
+	DisplayInit();					// Initialize LCD/I2C display
 	AlarmInit();					// Initialize automatic alarm sirene (arduino pro-mini)
 	BuzzerInit();					// Initialize Buzzer
 	RelaisInit();					// Relais board init
@@ -202,18 +250,23 @@ void setup() {
 	TempSensorsInit();				// Temperature sensors initialization
 	PH_SensorInit();				// PH sensor initialization
 	EC_SensorInit();				// PH sensor initialization
+	LevelSensorInit();				// Level sensor initialization
+	TurbiditySensorInit();			// Turbidity sensor initialization
 	KeyboardInit();					// Keyboard and IR receiver init
 	
 	dstatus = DS_IDLE_INIT;			// startup Dispatcher status
 	alrmsonoro = true;
+	main_page = MAIN_PAGE_FIRST;
 
 	#if defined(__SAM3X8E__)
+		analogReadResolution(ADC_RES_BITS);
+		analogWriteResolution(ADC_RES_BITS);
 		watchdogSetup();			// if not called, wdt is disabled
 		watchdogEnable(2000);		// watchdog time set to 2 secs
-		DEBUG(F("SAM"));
 	#else
 		wdt_enable(WDTO_2S);		// enable watchdog and set reset time to 2 secs.
-		DEBUG(F("AVR"));
 	#endif
-	DEBUG(F(" Watchdog enabled\nDone.\n"));
+	DEBUG(F("Analog ADC/DAC set to %d bits (resolution %s)\n"), ADC_RES_BITS, ftoa(buff, ADC_RESOLUTION));
+	DEBUG(F("PWM set to %d resolution\n"), PWM_RESOLUTION);
+	DEBUG(F("%s Watchdog enabled\nInitialization ended.\n"), SK_FEATURE);
 }

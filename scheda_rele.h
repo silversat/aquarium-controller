@@ -25,5 +25,5 @@ void RelaisInit() {
 		delay(100);								// wait 100 mS in order the bus stabilize.
 		digitalWrite(relaisPin[i], RL_OFF);		// switch relais off (security default)
 	}
-	DEBUG(F("Relais board OK\n"));
+	DEBUG(F("Relais board (%d channels) OK\n"), SR_RELAIS_NUM);
 }	

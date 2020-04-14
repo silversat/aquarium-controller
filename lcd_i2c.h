@@ -28,19 +28,19 @@ void displayClearRow( uint8_t row ) {
 
 void printCommit() {}
 	
-void printString( char* msg, byte col=0xFF, byte row=0xFF, byte commit=true ) {
+void printString( const char* msg, byte col=0xFF, byte row=0xFF, byte commit=true ) {
 	setCursor(col, row);
 	display.print(msg);
 }
 	
-void printStringCenter( char* msg, byte row=0xFF, byte commit=true ) {
+void printStringCenter( const char* msg, byte row=0xFF, byte commit=true ) {
 	if(row == 0xFF) row = DISPLAY_MAX_ROWS-1;		// if omitted ROW, print at last available row
 	displayClearRow(row);
 	setCursor((DISPLAY_MAX_COLS-strlen(msg))/2, row);
 	display.print(msg);
 }
 	
-void printBlinkingString( char* msg, byte row=0xFF ) {
+void printBlinkingString( const char* msg, byte row=0xFF ) {
 	static float blinkTimer;
 	static bool status;
 	if(blinkTimer + BLINK_TIMER < millis()) {

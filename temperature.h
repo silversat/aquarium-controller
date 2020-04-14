@@ -7,8 +7,6 @@ DeviceAddress Termometro1, Termometro2;			// temp sensor addresses
 boolean Tsensor1, Tsensor2;						// found temp sensors during setup one-wire bus scan
 unsigned long readTimer = 0;
 
-extern void relais( byte num, boolean action );
-
 float Tempacqua, Tempacquaset, Tempvecchia;
 bool alrmsonoro = true;
 bool alarm_cycle = false;
@@ -140,12 +138,6 @@ float WaterTemperatureHandler() {
 	
 	tempMed = getWaterTemperature();
 
-	if(tempMed < Tempacqua) {
-		relais(SR_RISCALDATORE, RL_ON); 
-	} else {
-		relais(SR_RISCALDATORE, RL_OFF);
-	}
-	
 	if((tempMed < (Tempacqua - TEMP_RANGE)) or (tempMed > (Tempacqua + TEMP_RANGE))) {
 		defcon = DEFCON_3;
 	} else if(defcon == DEFCON_3) {
@@ -170,13 +162,17 @@ float WaterTemperatureHandler() {
 			}
 			if(dstatus == DS_IDLE) {
 				if(alarm_cycle) {
-					printString(ftoa(buff, tempMed), 3, 2);
-					printChar(0b011011111);
+					if(main_page == 0) {
+						printString(ftoa(buff, tempMed), 3, 2);
+						printChar(0b011011111);
+					}
 					if(alrmsonoro) {
 						alarm(true, true);				// status = in alarm, beep ON
 					}
 				} else {
-					printSpaces(7, 3, 2);
+					if(main_page == 0) {
+						printSpaces(7, 3, 2);
+					}
 					alarm(true, false);					// status = in alarm, beep OFF
 				}
 			}
@@ -189,12 +185,28 @@ float WaterTemperatureHandler() {
 			break;
 			
 		case DEFCON_5:
-			if(dstatus == DS_IDLE) {
+			if(dstatus == DS_IDLE and main_page == 0) {
 				printString(ftoa(buff, tempMed), 3, 2);
 				printChar(0b011011111);
 			}
 			break;
 	}
+	
+#if defined SR_WATER_HEATER
+	if(defcon < 5) {
+		relais(SR_WATER_HEATER, RL_ON); 
+	} else {
+		relais(SR_WATER_HEATER, RL_OFF);
+	}
+#endif
+	if(main_page == 1 and dstatus == DS_IDLE) {
+//		printSpaces(7, 13, 2);
+		printString(isnan(tempMed) ? NOT_AVAILABLE : ftoa(buff, tempMed), 13, 2);
+#if defined SR_WATER_HEATER
+		printChar(relaisStatus(SR_WATER_HEATER)?'*':' ', 0, 2);
+#endif
+	}
+
 	return tempMed;
 }
 

@@ -53,10 +53,10 @@ void Water_PH_Handler( float tmed ) {
 	static float valuePH[PH_SAMPLES_NUM];
 	static uint8_t ph_idx = 0;
 	
- 	if((phTimer + PH_READ_INTERVAL) < millis()) {						//time interval: 1s
-		voltagePH[ph_idx] = analogRead(PIN_PH_SENSOR) / 1024.0 * 5000; 	// read the PH voltage (0~3.0V)
-		if(voltagePH[ph_idx] <= 3000) {									// max 3.0V = 3000mV
-			valuePH[ph_idx] = ph.readPH(voltagePH[ph_idx], tmed);  		// convert voltage to pH with temperature compensation
+ 	if((phTimer + PH_READ_INTERVAL) < millis()) {								//time interval: 1s
+		voltagePH[ph_idx] = analogRead(PIN_PH_SENSOR) / ADC_RESOLUTION * 5000; 	// read the PH voltage (0~3.0V)
+		if(voltagePH[ph_idx] <= 3000) {											// max 3.0V = 3000mV
+			valuePH[ph_idx] = ph.readPH(voltagePH[ph_idx], tmed);  				// convert voltage to pH with temperature compensation
 		}
 		float PHavg = calcRingBufAverage(valuePH, PH_SAMPLES_NUM);
 
@@ -70,13 +70,20 @@ void Water_PH_Handler( float tmed ) {
 			Serial.println();
 		#endif
 		if(dstatus == DS_IDLE) {
-			printString(isnan(PHavg) ? " N/A " : ftoa(buff, PHavg), 15, 2);
+			if(main_page == 0) {
+				printString(isnan(PHavg) ? NOT_AVAILABLE : ftoa(buff, PHavg), 15, 2);
+			} else if(main_page == 2) {
+				printString(isnan(PHavg) ? NOT_AVAILABLE : ftoa(buff, PHavg), 6, 1);
+#if defined SR_PH
+				printChar(relaisStatus(SR_PH)?'*':' ', 0, 1);
+#endif
+			}
 		}
 		if(++ph_idx >= PH_SAMPLES_NUM) ph_idx = 0;				// increment index and check for outbound
 		phTimer = millis();										// reset PH timer
 	}
 //	enable PH calibtration by remote
-//	ph.calibration(calcRingBufAverage(voltagePH, PH_SAMPLES_NUM), tmed);         	 				// PH calibration process by Serial CMD
+//	ph.calibration(calcRingBufAverage(voltagePH, PH_SAMPLES_NUM), tmed);     	// PH calibration process by Serial CMD
 }
 
 void Water_EC_Handler( float tmed ) {
@@ -84,10 +91,10 @@ void Water_EC_Handler( float tmed ) {
 	static float voltageEC[EC_SAMPLES_NUM];
 	static uint8_t ec_idx = 0;
 	
- 	if((ecTimer + EC_READ_INTERVAL) < millis()) {						//time interval: 1s
-		voltageEC[ec_idx] = analogRead(PIN_EC_SENSOR) / 1024.0 * 5000; 	// read the EC voltage (0~3.4V)
-		if(voltageEC[ec_idx] <= 3400) {									// max 3.4V = 3400mV
-			valueEC[ec_idx] = ec.readEC(voltageEC[ec_idx], tmed);  		// convert voltage to EC with temperature compensation
+ 	if((ecTimer + EC_READ_INTERVAL) < millis()) {								//time interval: 1s
+		voltageEC[ec_idx] = analogRead(PIN_EC_SENSOR) / ADC_RESOLUTION * 5000; 	// read the EC voltage (0~3.4V)
+		if(voltageEC[ec_idx] <= 3400) {											// max 3.4V = 3400mV
+			valueEC[ec_idx] = ec.readEC(voltageEC[ec_idx], tmed);  				// convert voltage to EC with temperature compensation
 		}
 		float ECavg = calcRingBufAverage(valueEC, EC_SAMPLES_NUM);
 
@@ -101,7 +108,14 @@ void Water_EC_Handler( float tmed ) {
 			Serial.println();
 		#endif
 		if(dstatus == DS_IDLE) {
-			printString(isnan(ECavg) ? " N/A " : ftoa(buff, ECavg), 15, 3);
+			if(main_page == 0) {
+				printString(isnan(ECavg) ? NOT_AVAILABLE : ftoa(buff, ECavg), 15, 3);
+			} else if(main_page == 2) {
+				printString(isnan(ECavg) ? NOT_AVAILABLE : ftoa(buff, ECavg), 6, 2);
+#if defined SR_EC
+				printChar(relaisStatus(SR_EC)?'*':' ', 0, 1);
+#endif
+			}
 		}
 		if(++ec_idx >= EC_SAMPLES_NUM) ec_idx = 0;				// increment index and check for outbound
 		ecTimer = millis();										// reset PH timer
@@ -130,7 +144,7 @@ void sensorsCalibration_PH( float tmed ) {
 			phCalibrationStep++;
 		}
 	} else if(phCalibrationStep == 1) {
-		float voltage = analogRead(PIN_PH_SENSOR) / 1024.0 * 5000;	// read the PH voltage (0~3.0V)
+		float voltage = analogRead(PIN_PH_SENSOR) / ADC_RESOLUTION * 5000;	// read the PH voltage (0~3.0V)
 		
 		displayClear();
 		printStringCenter("Buffer solution", 0);
@@ -193,7 +207,7 @@ void sensorsCalibration_EC( float tmed ) {
 			ecCalibrationStep++;
 		}
 	} else {
-		voltage = analogRead(PIN_EC_SENSOR) / 1024.0 * 5000;			// read the EC voltage (0~3.4V)
+		voltage = analogRead(PIN_EC_SENSOR) / ADC_RESOLUTION * 5000;	// read the EC voltage (0~3.4V)
 		KValue = ec.readEC(voltage, tmed);								// convert voltage to EC with temperature compensation
 		if(ecCalibrationStep == 1) {
 			printString(ftoa(buff, KValue), 13, 1);
@@ -245,25 +259,51 @@ void sensorsCalibration_EC( float tmed ) {
 }
 
 void PH_SensorInit() {
-	int i;
+	int count;
 	DEBUG(F("PH sensor values: "));
-    ph.begin();
-	i = NvramReadAnything(NVRAM_PH_NEUTRAL, neutralVoltage);
-	DEBUG(F("neutral = %f (%d bytes)"), neutralVoltage, i);
-	i = NvramReadAnything(NVRAM_PH_ACID, acidVoltage);
-	DEBUG(F(", acid = %f (%d bytes)"), acidVoltage, i);
-	phTimer = millis();											// start PH measuring timer
+	
+	count = NvramReadAnything(NVRAM_PH_NEUTRAL, neutralVoltage);
+	if(neutralVoltage <= 0 or neutralVoltage > 0xFFFF or count != 4) {		// if value not set, write defaults to nvram
+		neutralVoltage = 1500.00;
+		NvramWriteAnything(NVRAM_PH_NEUTRAL, neutralVoltage);
+		count = NvramReadAnything(NVRAM_PH_NEUTRAL, neutralVoltage);
+	}
+	DEBUG(F("neutral = %s (%d bytes)"), ftoa(buff, neutralVoltage), count);
+
+	count = NvramReadAnything(NVRAM_PH_ACID, acidVoltage);
+	if(acidVoltage <= 0 or acidVoltage > 0xFFFF or count != 4) {
+		acidVoltage = 2032.44;
+		NvramWriteAnything(NVRAM_PH_ACID, acidVoltage);
+		count = NvramReadAnything(NVRAM_PH_ACID, acidVoltage);
+	}
+	DEBUG(F(", acid = %s (%d bytes)"), ftoa(buff, acidVoltage), count);
+
+    ph.begin(neutralVoltage, acidVoltage);
+	phTimer = millis();														// start PH measuring timer
 	DEBUG(F(" ==> OK\n"));
 }
 
 void EC_SensorInit() {
-	int i;
+	int count;
 	DEBUG(F("EC sensor K values: "));
-    ec.begin();
-	i = NvramReadAnything(NVRAM_EC_KVALUEHIGH, kvalueHigh);
-	DEBUG(F("high = %f (%d bytes)"), kvalueHigh, i);
-	i = NvramReadAnything(NVRAM_EC_KVALUELOW, kvalueLow);
-	DEBUG(F(", low = %f (%d bytes)"), kvalueLow, i);
+	
+	count = NvramReadAnything(NVRAM_EC_KVALUEHIGH, kvalueHigh);
+	if(kvalueHigh <= 0.00 or kvalueHigh > 0xFFFF or count != 4) {
+		kvalueHigh = 1.00;
+		NvramWriteAnything(NVRAM_EC_KVALUEHIGH, kvalueHigh);
+		count = NvramReadAnything(NVRAM_EC_KVALUEHIGH, kvalueHigh);
+	}
+	DEBUG(F("high = %s (%d bytes)"), ftoa(buff, kvalueHigh), count);
+	
+	count = NvramReadAnything(NVRAM_EC_KVALUELOW, kvalueLow);
+	if(kvalueLow <= 0.00 or kvalueLow > 0xFFFF or count != 4) {
+		kvalueLow = 1.00;
+		NvramWriteAnything(NVRAM_EC_KVALUELOW, kvalueLow);
+		count = NvramReadAnything(NVRAM_EC_KVALUELOW, kvalueLow);
+	}
+	DEBUG(F(", low = %s (%d bytes)"), ftoa(buff, kvalueLow), count);
+    ec.begin(kvalueLow, kvalueHigh);
 	ecTimer = millis();											// start PH measuring timer
 	DEBUG(F(" ===> OK\n"));
 }
+

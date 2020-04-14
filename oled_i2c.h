@@ -5,10 +5,13 @@
 
 #if defined(OLED_32)				// OLED display height, in pixels
 	#define SCREEN_HEIGHT 	32 
+	#define OLED_ADDR		OLED_32
 #elif defined(OLED_64)
 	#define SCREEN_HEIGHT	64
+	#define OLED_ADDR		OLED_64
 #elif defined(OLED_128)
 	#define SCREEN_HEIGHT	128
+	#define OLED_ADDR		OLED_128 
 #else	
 	#message DISPLAY RESOLUTION ERROR
 #endif
@@ -65,13 +68,13 @@ void printCommit() {
 	display.display();
 }
 	
-void printString( char* msg, byte col=0xFF, byte row=0xFF, byte commit=true ) {
+void printString( const char* msg, byte col=0xFF, byte row=0xFF, byte commit=true ) {
 	setCursor(col, row);
 	display.print(msg);
 	if(commit) display.display();
 }
 	
-void printStringCenter( char* msg, byte row=0xFF, byte commit=true ) {
+void printStringCenter( const char* msg, byte row=0xFF, byte commit=true ) {
 	if(row == 0xFF) row = DISPLAY_MAX_ROWS-1;		// if omitted ROW, print at last available row
 	displayClearRow(row);
 	setCursor((DISPLAY_MAX_COLS-strlen(msg))/2, row);
@@ -79,7 +82,7 @@ void printStringCenter( char* msg, byte row=0xFF, byte commit=true ) {
 	if(commit) display.display();
 }
 	
-void printBlinkingString( char* msg, byte row=0xFF ) {
+void printBlinkingString( const char* msg, byte row=0xFF ) {
 	static float blinkTimer;
 	static bool status;
 	if(blinkTimer + BLINK_TIMER < millis()) {
@@ -93,7 +96,7 @@ void printBlinkingString( char* msg, byte row=0xFF ) {
 	}
 }
 
-void printChar( char chr, byte col=0xFF, byte row=0xFF ) {
+void printChar( const char chr, byte col=0xFF, byte row=0xFF ) {
 	setCursor(col, row);
 	display.print(chr);
 	display.display();
@@ -106,11 +109,11 @@ void printNumber( float number, byte col=0xFF, byte row=0xFF ) {
 }
 	
 void DisplayInit() {
-	display.begin(SSD1306_SWITCHCAPVCC, 0x00);		// inizializzazione del display  (0x3C, 0x3D, 0x78, 0x7A)
+	display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);		// inizializzazione del display  (0x3C, 0x3D, 0x78, 0x7A)
 	display.display();
-	display.setTextSize(1);     					// Normal 1:1 pixel scale
-	display.setTextColor(WHITE, BLACK);				// Draw white text
-	display.setCursor(0, 0);    					// Start at top-left corner
-	display.cp437(true);							// Use full 256 char 'Code Page 437' font
-	DEBUG(F("Oled display OK\n"));
+	display.setTextSize(1);     						// Normal 1:1 pixel scale
+	display.setTextColor(WHITE, BLACK);					// Draw white text
+	display.setCursor(0, 0);    						// Start at top-left corner
+	display.cp437(true);								// Use full 256 char 'Code Page 437' font
+	DEBUG(F("Oled display (%dx%d) OK\n"), SCREEN_WIDTH, SCREEN_HEIGHT);
 }

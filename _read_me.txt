@@ -6,3 +6,7 @@
 - il ds18b20 per default è montato sul pin 46
 - il display: SDA: 20, SCL, 21
 - il ricevitore IR sul pin 49.
+- water level sensor pin 18
+- water turbidity sensor pin A4
+- water PH sensor pin A8
+- water EC sensor pin A11
